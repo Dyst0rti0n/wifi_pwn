@@ -9,6 +9,7 @@ This project contains a script to perform a Wi-Fi deauthentication attack using 
 - **Tools**: `aircrack-ng`, `iw`, `wireless-tools`
 - **Python**: Python 3.x
 
+
 ## Project Structure
 
 ```
@@ -19,13 +20,13 @@ This project contains a script to perform a Wi-Fi deauthentication attack using 
 
 ## Setup Instructions
 
-### 1. Install System Dependencies
+### 1. Install System Dependencies (Linux Only)
 
 Ensure you have the following system packages installed:
 
 ```sh
 sudo apt update
-sudo apt install -y aircrack-ng iw wireless-tools
+sudo apt install -y aircrack-ng iw wireless-tools matploitlib
 ```
 
 ### 2. Clone the Repository
@@ -33,30 +34,29 @@ sudo apt install -y aircrack-ng iw wireless-tools
 Clone this repository to your local machine:
 
 ```sh
-git clone https://github.com/jimididit/wifi_pwn.git
+git clone https://github.com/Dyst0rti0n/wifi_pwn.git
 cd wifi_pwn
 ```
 
-### 3. Set Up Python Environment
-
-There are no additional Python packages required for this script. If you have other scripts or future extensions that require Python packages, you can list them in `requirements.txt` and install them using:
+### 3. Install Python Dependencies
 
 ```sh
-pip install -r requirements.txt
+pip install matplotlib
 ```
 
 ### 4. Run the Script
 
-Make sure the script is executable:
+Make sure the script is executable (Linux only):
 
 ```sh
 chmod +x wifi_pwn.py
 ```
 
-Run the wifi_pwn.py script with superuser privileges:
+Run the wifi_pwn.py script with superuser privileges (Linux) or as Administrator (Windows):
 
 ```sh
-sudo ./wifi_pwn.py
+sudo ./wifi_pwn.py # For Linux
+python wifi_pwn.py # For Windows
 ```
 
 ## Usage Instructions
@@ -64,7 +64,7 @@ sudo ./wifi_pwn.py
 ### Initial Setup
 
 1. **Superuser Check**:
-    - The script will check if it is running with superuser privileges. If not, it will prompt you to run it with `sudo`.
+    - The script will check if it is running with superuser privileges. If not, it will prompt you to run it with 'sudo' (Linux) or as Administrator (Windows).
 
 2. **CSV Backup**:
     - The script will move any existing CSV files in the current directory to a backup folder to prevent data loss.
@@ -85,7 +85,7 @@ sudo ./wifi_pwn.py
 5. **Network Interface Selection**:
     - The script will list available network interface controllers and prompt you to select one to use for monitoring.
 
-6. **Monitor Mode**:
+6. **Monitor Mode** (Linux only):
     - The selected NIC will be set to monitor mode, and the script will begin scanning for networks.
 
 ### Network Selection
@@ -103,7 +103,7 @@ sudo ./wifi_pwn.py
 
 ### Cleanup
 
-10. **Reset NIC**:
+10. **Reset NIC** (Linux only):
     - After the attack, the script will reset the NIC to managed mode and restart network services.
 
 ## Disclaimer

